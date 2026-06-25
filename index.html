@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth theme-ir">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuDay | Quantum Cyber-Sovereignty</title>
+    <meta name="description" content="QuDay delivers quantum-grade cybersecurity hardware, software, and consultancy for a post-quantum world.">
+
+    <!-- Preconnect for font performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&family=JetBrains+Mono:wght@300;400;700&family=Space+Grotesk:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,900;1,400&display=swap"
+        rel="stylesheet">
+
+    <!-- Iconify -->
+    <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+
+    <!-- Tailwind via CDN (dev only) — with full config -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                        display: ['Space Grotesk', 'sans-serif'],
+                    },
+                    colors: {
+                        quantum: {
+                            50: 'var(--q-50)', 100: 'var(--q-100)',
+                            200: 'var(--q-200)', 300: 'var(--q-300)',
+                            400: 'var(--q-400)', 500: 'var(--q-500)',
+                            600: 'var(--q-600)', 700: 'var(--q-700)',
+                            800: 'var(--q-800)', 900: 'var(--q-900)',
+                        },
+                        surface: {
+                            base: 'var(--surface-base)',
+                            panel: 'var(--surface-panel)',
+                            border: 'var(--surface-border)',
+                        },
+                        content: {
+                            main: 'var(--content-main)',
+                            dim: 'var(--content-dim)',
+                            sub: 'var(--content-sub)',
+                        }
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'pulse-slow': 'pulse 6s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'marquee': 'marquee 50s linear infinite',
+                        'spin-slow': 'spin 15s linear infinite',
+                        'shimmer': 'shimmer 2s linear infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-15px)' },
+                        },
+                        marquee: {
+                            '0%': { transform: 'translateX(0%)' },
+                            '100%': { transform: 'translateX(-50%)' },
+                        },
+                        shimmer: {
+                            '0%': { backgroundPosition: '-200% 0' },
+                            '100%': { backgroundPosition: '200% 0' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+
+<body class="noise-bg">
+    <!-- Background layers -->
+    <div id="quantum-field"></div>
+    <div class="perspective-grid"></div>
+
+    <!-- ============================================================
+         CURSOR SYSTEM — dot + ring + 6 trailing particles
+         ============================================================ -->
+    <div id="cursor-dot"></div>
+    <div id="cursor-outline"></div>
+    <div id="cursor-trail-container">
+        <!-- JS will populate trails -->
+    </div>
+
+    <!-- React root -->
+    <div id="root" class="relative z-50"></div>
+
+    <!-- ============================================================
+         CURSOR ENGINE — Advanced version with trails & click burst
+         ============================================================ -->
+    <script>
+        (function () {
+            /* ── Elements ── */
+            const dot = document.getElementById('cursor-dot');
+            const ring = document.getElementById('cursor-outline');
+            const trailContainer = document.getElementById('cursor-trail-container');
+
+            /* ── State ── */
+            let mouseX = -300, mouseY = -300;
+            let ringX = -300, ringY = -300;
+            let isHovering = false;
+            let isClicking = false;
+            const TRAIL_COUNT = 7;
+            const trails = [];
+            const trailPositions = [];   // circular buffer of recent positions
+            const TRAIL_BUFFER = 28;     // how many past positions to store
+            const posBuffer = Array.from({ length: TRAIL_BUFFER }, () => ({ x: -300, y: -300 }));
+            let posIndex = 0;
+
+            /* ── Hover aura ── */
+            const aura = document.createElement('div');
+            aura.className = 'hover-aura';
+            aura.style.opacity = '0';
+            document.body.appendChild(aura);
+
+            /* ── Build trail dots ── */
+            for (let i = 0; i < TRAIL_COUNT; i++) {
+                const t = document.createElement('div');
+                t.className = 'cursor-trail';
+                const scale = 1 - (i / TRAIL_COUNT) * 0.75;
+                t.style.cssText = `
+                    width: ${6 * scale}px;
+                    height: ${6 * scale}px;
+                    opacity: ${(1 - i / TRAIL_COUNT) * 0.55};
+                    border-radius: 50%;
+                    background: var(--accent);
+                    position: fixed;
+                    pointer-events: none;
+                    z-index: ${999989 - i};
+                    transform: translate(-50%, -50%);
+                    transition: background 0.3s;
+                    will-change: left, top;
+                `;
+                trailContainer.appendChild(t);
+                trails.push(t);
+            }
+
+            /* ── Get theme accent color ── */
+            function getThemeColors() {
+                const root = document.documentElement;
+                if (root.classList.contains('theme-ir')) {
+                    return {
+                        outer: 'rgba(249,115,22,0.55)',
+                        inner: 'rgba(251,146,60,0.8)',
+                        shock: 'rgba(249,115,22,0.18)'
+                    };
+                }
+                return {
+                    outer: 'rgba(168,85,247,0.55)',
+                    inner: 'rgba(139,92,246,0.8)',
+                    shock: 'rgba(168,85,247,0.18)'
+                };
+            }
+
+            /* ── Mouse move ── */
+            document.addEventListener('mousemove', (e) => {
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+
+                /* Instant dot position */
+                dot.style.left = mouseX + 'px';
+                dot.style.top = mouseY + 'px';
+
+                /* Aura position */
+                aura.style.left = mouseX + 'px';
+                aura.style.top = mouseY + 'px';
+
+                /* Store position in circular buffer */
+                posBuffer[posIndex] = { x: mouseX, y: mouseY };
+                posIndex = (posIndex + 1) % TRAIL_BUFFER;
+
+                /* Spotlight effect on hovered cards */
+                try {
+                    const cards = document.querySelectorAll('.spotlight-card');
+                    cards.forEach(card => {
+                        const rect = card.getBoundingClientRect();
+                        const cx = rect.left + rect.width / 2;
+                        const cy = rect.top + rect.height / 2;
+                        const dx = mouseX - cx, dy = mouseY - cy;
+                        const dist = Math.hypot(dx, dy);
+                        if (dist < 320) {
+                            const f = 1 - dist / 320;
+                            const tx = (dx / rect.width) * 3.5 * f;
+                            const ty = (dy / rect.height) * 3.5 * f;
+                            const sx = (dx / rect.width) * 4 * f;
+                            const sy = (dy / rect.height) * 4 * f;
+                            card.style.transform = `translate3d(${sx}px,${sy}px,0) rotateX(${-ty}deg) rotateY(${tx}deg)`;
+                            card.style.setProperty('--spotlight-x', (mouseX - rect.left) + 'px');
+                            card.style.setProperty('--spotlight-y', (mouseY - rect.top) + 'px');
+                        } else {
+                            card.style.transform = '';
+                        }
+                    });
+                } catch (_) {}
+            });
+
+            /* ── Smooth ring follow ── */
+            function animateRing() {
+                const ease = isClicking ? 0.22 : 0.1;
+                ringX += (mouseX - ringX) * ease;
+                ringY += (mouseY - ringY) * ease;
+                ring.style.left = ringX + 'px';
+                ring.style.top = ringY + 'px';
+
+                /* Trail positions from buffer */
+                for (let i = 0; i < TRAIL_COUNT; i++) {
+                    const bufIdx = ((posIndex - 1 - i * 3) + TRAIL_BUFFER * 4) % TRAIL_BUFFER;
+                    const pos = posBuffer[bufIdx];
+                    trails[i].style.left = pos.x + 'px';
+                    trails[i].style.top = pos.y + 'px';
+                }
+
+                requestAnimationFrame(animateRing);
+            }
+            animateRing();
+
+            /* ── Hover detection ── */
+            const HOVER_SELECTORS = 'button, a, .interactive, input, textarea, summary, [class*="card"], [class*="panel"], [class*="btn"]';
+
+            document.addEventListener('mouseover', (e) => {
+                if (e.target.closest(HOVER_SELECTORS)) {
+                    document.body.classList.add('hovering');
+                    aura.style.opacity = '1';
+                    isHovering = true;
+                    /* Show trails brighter on hover */
+                    trails.forEach((t, i) => {
+                        t.style.opacity = ((1 - i / TRAIL_COUNT) * 0.7).toString();
+                    });
+                }
+            });
+            document.addEventListener('mouseout', (e) => {
+                if (e.target.closest(HOVER_SELECTORS)) {
+                    document.body.classList.remove('hovering');
+                    aura.style.opacity = '0';
+                    isHovering = false;
+                    trails.forEach((t, i) => {
+                        t.style.opacity = ((1 - i / TRAIL_COUNT) * 0.45).toString();
+                    });
+                }
+            });
+
+            /* ── Mouse down / up states ── */
+            document.addEventListener('mousedown', () => {
+                document.body.classList.add('clicking');
+                isClicking = true;
+            });
+            document.addEventListener('mouseup', () => {
+                document.body.classList.remove('clicking');
+                isClicking = false;
+            });
+
+            /* ── Click burst effect ── */
+            document.addEventListener('click', (e) => {
+                const c = getThemeColors();
+                const cx = e.clientX, cy = e.clientY;
+
+                /* Outer ring */
+                const wave = Object.assign(document.createElement('div'), { className: 'click-wave' });
+                wave.style.cssText = `left:${cx}px;top:${cy}px;border:2px solid ${c.outer};box-shadow:0 0 16px ${c.outer},inset 0 0 10px ${c.outer};`;
+                document.body.appendChild(wave);
+
+                /* Inner flash */
+                const inner = Object.assign(document.createElement('div'), { className: 'click-wave-inner' });
+                inner.style.cssText = `left:${cx}px;top:${cy}px;background:radial-gradient(circle,${c.inner} 0%,transparent 70%);`;
+                document.body.appendChild(inner);
+
+                /* Shockwave (large delayed ring) */
+                setTimeout(() => {
+                    const shock = Object.assign(document.createElement('div'), { className: 'click-shockwave' });
+                    shock.style.cssText = `left:${cx}px;top:${cy}px;border:1px solid ${c.outer.replace('0.55', '0.25')};background:radial-gradient(circle,${c.shock} 0%,transparent 60%);`;
+                    document.body.appendChild(shock);
+                    setTimeout(() => shock.remove(), 1100);
+                }, 60);
+
+                /* Second staggered ring */
+                setTimeout(() => {
+                    const wave2 = Object.assign(document.createElement('div'), { className: 'click-wave' });
+                    wave2.style.cssText = `left:${cx}px;top:${cy}px;border:1px solid ${c.outer.replace('0.55', '0.3')};animation-delay:0.08s;`;
+                    document.body.appendChild(wave2);
+                    setTimeout(() => wave2.remove(), 820);
+                }, 80);
+
+                /* Cleanup */
+                setTimeout(() => { wave.remove(); inner.remove(); }, 800);
+            });
+
+            /* ── Mouse leave page — hide cursor ── */
+            document.addEventListener('mouseleave', () => {
+                dot.style.opacity = '0';
+                ring.style.opacity = '0';
+                trails.forEach(t => t.style.opacity = '0');
+                aura.style.opacity = '0';
+            });
+            document.addEventListener('mouseenter', () => {
+                dot.style.opacity = '1';
+                ring.style.opacity = '1';
+            });
+        })();
+    </script>
+
+    <!-- React entry -->
+    <script type="module" src="/index.tsx"></script>
+</body>
+
+</html>
